@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hubris Rental - Sistema Completo</title>
+    <script src="./script.js" defer></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<link rel="stylesheet" href="style-new.css">
+</head>
+<body>
+    <div id="notifications-container" class="notifications-container"></div>
+    <div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+        <img src="https://i.imgur.com/ABMgyI8.png" alt="Logo" style="width: 60px; height: 60px; margin-bottom: 20px;">
+        <h2>HUBRIS RENTAL - ACCESSO</h2>
+        <input type="password" id="passwordInput" class="login-input" placeholder="Inserisci la password" onkeypress="checkEnter(event)">
+        <div id="loginError" class="login-error" style="display: none;">Password errata!</div>
+       <button class="btn btn-primary" onclick="checkPassword()" style="width: 100%; margin-top: 15px;">🔐 ACCEDI</button>
+        <p style="font-size: 12px; color: #666; margin-top: 20px;">Sistema interno Hubris Pictures</p>
+    </div>
+</div>
+    <nav class="navbar">
+    <div class="nav-content">
+      <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+    <img src="https://i.imgur.com/ABMgyI8.png" alt="Hubris Pictures Logo" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
+    <span style="font-size: 20px; font-weight: bold; color: #2c5aa0;">HUBRIS PICTURES S.R.L.</span>
+</div>
+        <div class="connection-status">
+            <span class="status-indicator" id="connectionStatus"></span>
+            <span id="connectionText">Connecting...</span>
+            <span>|</span>
+            <span id="lastSync">Ultimo sync: mai</span>
+            <span>|</span>
+<button class="btn btn-warning" onclick="document.getElementById('configModal').classList.add('active')" style="padding: 6px 12px; font-size: 12px;">⚙️ Config</button>
+<button class="btn btn-config" onclick="updateGitHubToken()" title="Aggiorna GitHub Token">
+    🔑 Token
+</button>            
+    </div>
+</nav>
+<div class="container">
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('database')">🗄️ Database</button>
+        <button class="tab" onclick="showTab('quotes')">📋 Nuovo Preventivo</button>
+        <button class="tab" onclick="showTab('saved')">💾 Preventivi Salvati</button>
+        <button class="tab" onclick="showTab('insurance')">🛡️ Valori Assicurativi</button>
+        <button class="tab" onclick="showTab('analytics')">📊 Analytics</button>
+        <button class="btn btn-danger" onclick="logout()" style="padding: 6px 12px; font-size: 12px;">🔒 Logout</button>
+    </div>
+
+   <!-- CONFIG MODAL -->
+<div id="configModal" class="modal">
+    <div class="modal-content">
+        <h2 style="color: #2c5aa0; margin-bottom: 20px;">⚙️ Configurazione Sistema</h2>
+        <div class="form-group">
+            <label class="form-label">API Key:</label>
+            <input type="text" class="form-input" id="apiKeyInput" placeholder="Inserisci la tua API Key">
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label">Sheets ID:</label>
+            <input type="text" class="form-input" id="sheetsIdInput" placeholder="ID del tuo Google Sheets">
+        </div>
+   <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap;">
+    <button class="btn btn-danger" onclick="document.getElementById('configModal').classList.remove('active')" style="flex: 1; min-width: 100px;">Annulla</button>
+   <button class="btn btn-success" id="saveConfigBtn" style="flex: 1; min-width: 120px;">💾 Salva</button>
+        </div>
+    </div>
+</div>
+
+    <!-- DATABASE TAB -->
+    <div id="database" class="tab-content active">
+        <div class="section-header">
+            <h2 class="section-title">Database Attrezzature</h2>
+            <div id="dbStats" style="font-size: 14px; color: #666;"></div>
+        </div>
+        <div class="controls-grid">
+            <input type="text" class="search-box" placeholder="🔍 Cerca attrezzatura..." onkeyup="filterDatabase()" id="searchInput">
+            <select class="filter-select" onchange="filterByCategory()" id="categoryFilter">
+                <option value="">Tutte le categorie</option>
+            </select>
+            <button class="btn btn-success" onclick="addNewEquipment()">+ Nuova</button>
+            <button class="btn btn-warning" onclick="syncDatabase()" id="syncBtn">🔄 Sync</button>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Attrezzatura</th>
+                        <th>1 Giorno</th>
+                        <th>3 Giorni</th>
+                        <th>1 Settimana</th>
+                        <th>Valore Assic.</th>
+                        <th>Kit/Note</th>
+                        <th>Seriale</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody id="databaseBody">
+                    <tr><td colspan="7" style="text-align: center; padding: 40px; color: #666;">Configura le API per caricare il database...</td></tr>
+               </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- QUOTES TAB -->
+    <div id="quotes" class="tab-content">
+        <div class="section-header">
+            <h2 class="section-title">Nuovo Preventivo</h2>
+        </div>
+        <div class="quote-header">
+            <div class="quote-controls">
+                <div class="form-group">
+                    <label class="form-label">Nome Preventivo</label>
+                    <input type="text" class="form-input" id="quoteName" placeholder="Es: Spot TV Audi Q3">
+                </div>
+                <button class="btn btn-success" id="saveBtn" onclick="saveQuote()">💾 Salva</button>
+<button class="btn btn-success" id="saveAsNewBtn" onclick="saveAsNew()" style="display: none;">💾 Salva Come Nuovo</button>
+<button class="btn btn-info" onclick="loadQuoteById()">📂 Carica</button>
+<button class="btn btn-warning" onclick="duplicateQuote()">📄 Duplica</button>
+<button class="btn btn-danger" onclick="resetQuote()">🔄 Reset</button>
+            </div>
+        </div>
+       <div class="form-grid">
+    <div class="form-group">
+        <label class="form-label">Cliente</label>
+        <input type="text" class="form-input" id="cliente" placeholder="Nome del cliente">
+    </div>
+    <div class="form-group">
+        <label class="form-label">P.IVA Cliente</label>
+        <input type="text" class="form-input" id="clientePiva" placeholder="Partita IVA del cliente">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Via/Indirizzo</label>
+        <input type="text" class="form-input" id="clienteVia" placeholder="Via/Indirizzo del cliente">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Codice Univoco</label>
+        <input type="text" class="form-input" id="codiceUnivoco" placeholder="Codice SDI/PEC">
+    </div>
+        <div class="form-group">
+    <label class="form-label">PEC Cliente</label>
+    <input type="email" class="form-input" id="clientePec" placeholder="PEC del cliente">
+</div>
+    <div class="form-group">
+        <label class="form-label">Contatti</label>
+        <input type="text" class="form-input" id="contatti" placeholder="Telefono/Email">
+    </div>
+            <div class="form-group">
+                <label class="form-label">Data Carico</label>
+                <input type="date" class="form-input" id="carico">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Data Scarico</label>
+                <input type="date" class="form-input" id="scarico">
+            </div>
+        </div>
+        <div class="form-grid" style="grid-template-columns: auto auto auto 1fr auto auto;">
+            <div class="form-group">
+                <label class="form-label">Durata (giorni)</label>
+                <input type="number" class="form-input" id="durata" value="1" min="1" max="30" onchange="updateAllPrices()" style="width: 100px;">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Sconto (%)</label>
+                <input type="number" class="form-input" id="sconto" value="0" min="0" max="50" step="0.1" onchange="updateTotals()" style="width: 100px;">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tipo</label>
+                <select class="form-input" id="quoteType">
+                    <option value="rental">Noleggio</option>
+                    <option value="sale">Vendita</option>
+                    <option value="service">Servizio</option>
+                </select>
+            </div>
+            <div></div>
+        </div>
+        <div class="equipment-section">
+         <div class="equipment-header">
+    <h3>Lista Attrezzature e Servizi</h3>
+    <div>
+        <button class="btn btn-info" onclick="generatePDF()">📄 Preventivo</button>
+        <button class="btn btn-success" onclick="generateNoPricesQuote()">📋 Senza Prezzi</button>
+        <button class="btn btn-warning" onclick="generateDDT()">🚛 DDT</button>
+        <button class="btn btn-warning" onclick="generateInsurance()">🛡️ Assicurazione</button>
+    </div>
+</div>
+            <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">☰</th>
+                        <th style="width: 180px;">Categoria</th>
+                        <th style="width: 280px;">Attrezzatura/Servizio</th>
+                         <th style="width: 60px;">Qtà</th>
+                        <th style="width: 100px;">Prezzo Unit.</th>
+                        <th style="width: 100px;">Totale</th>
+                        <th style="width: 80px;">Azioni</th>
+                     </tr>
+                </thead>
+                <tbody id="equipmentRows"></tbody>
+            </table>
+        </div>
+        </div>
+       <div style="display: flex; gap: 10px; justify-content: center; margin: 20px 0;">
+            <button class="btn btn-primary" onclick="addEquipmentRow()">+ Attrezzatura</button>
+            <button class="btn btn-warning" onclick="addCustomEquipmentRow()">+ Custom</button>
+            <button class="btn btn-info" onclick="addServiceRow()">+ Servizio</button>
+        </div>
+        <div class="totals-section">
+        </div>
+        <div class="totals-section">
+    <div>
+        <!-- SUBTOTALE SBARRATO (OPZIONALE) -->
+        <div class="total-line" id="crossed-subtotal-line" style="display: none;">
+            <span>Subtotale:</span>
+            <span id="crossed-subtotal" style="text-decoration: line-through; color: #999;">€ 0.00</span>
+        </div>
+        
+        <!-- CONTROLLO SUBTOTALE SBARRATO -->
+        <div class="total-line" style="border-bottom: 1px solid #e1e5e9; padding-bottom: 10px; margin-bottom: 10px;">
+            <span>
+                <input type="checkbox" id="enable-crossed-subtotal" onchange="toggleCrossedSubtotal()" style="margin-right: 8px;">
+                <label for="enable-crossed-subtotal" style="font-size: 14px; cursor: pointer;">Mostra subtotale sbarrato</label>
+            </span>
+            <input type="number" id="crossed-subtotal-input" placeholder="0.00" step="0.01" min="0" 
+                   onchange="updateCrossedSubtotal()" style="width: 100px; text-align: right; padding: 4px; border: 1px solid #ddd; border-radius: 4px; display: none;">
+        </div>
+        
+        <div class="total-line">
+            <span>Subtotale:</span>
+            <span id="subtotale" onclick="makeSubtotalEditable()" 
+                  style="cursor: pointer; text-decoration: underline;" 
+                  title="Clicca per modificare">€ 0.00</span>
+        </div>
+        <div class="total-line">
+            <span>Sconto (<span id="discount-percent">0</span>%):</span>
+            <span id="sconto-amount">€ 0.00</span>
+        </div>
+        <div class="total-line">
+            <span>Imponibile:</span>
+            <span id="imponibile">€ 0.00</span>
+        </div>
+        <div class="total-line">
+            <span>IVA (22%):</span>
+            <span id="iva">€ 0.00</span>
+        </div>
+        <div class="total-line final">
+            <span>TOTALE:</span>
+            <span id="totale">€ 0.00</span>
+        </div>
+    </div>
+</div>
+    </div>
+
+    <!-- SAVED QUOTES TAB -->
+    <div id="saved" class="tab-content">
+        <div class="section-header">
+            <h2 class="section-title">Preventivi Salvati</h2>
+            <div>
+                <button class="btn btn-warning" onclick="syncQuotes()">🔄 Aggiorna</button>
+                <button class="btn btn-info" onclick="exportAllQuotes()">📊 Export Excel</button>
+                <button class="btn btn-success" onclick="cleanAndReloadQuotes()">🔄 Ricarica da GitHub</button>
+                
+                <script>
+                function cleanAndReloadQuotes() {
+                    console.log('🧹 Pulizia e ricaricamento preventivi...');
+                    localStorage.removeItem('hubris_quotes');
+                    savedQuotes = [];
+                    renderSavedQuotes();
+                    setTimeout(() => {
+                        loadQuotesFromGitHub();
+                    }, 500);
+                }
+                </script>
+            </div>
+        </div>
+        <div class="quotes-grid" id="savedQuotes">
+            <div class="quote-card">
+                <div class="quote-title">Caricamento...</div>
+                <div class="quote-meta">Sincronizzazione con Google Sheets in corso...</div>
+            </div>
+        </div>
+    </div>
+    <!-- INSURANCE VALUES TAB -->
+<div id="insurance" class="tab-content">
+    <div class="section-header">
+        <h2 class="section-title">Gestione Valori Assicurativi</h2>
+        <div>
+            <select class="form-input" id="insurance-quote-selector" style="width: 300px;">
+                <option value="">Seleziona un preventivo...</option>
+            </select>
+           <button class="btn btn-warning" id="syncInsuranceBtn">🔄 Sincronizza</button>
+        </div>
+    </div>
+    
+    <div id="insurance-info" style="display: none;">
+        <div class="form-grid" style="margin-bottom: 20px;">
+            <div class="form-group">
+                <label class="form-label">Cliente</label>
+                <input type="text" class="form-input" id="insurance-cliente" readonly style="background: #f5f5f5;">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Progetto</label>
+                <input type="text" class="form-input" id="insurance-progetto" readonly style="background: #f5f5f5;">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Data Valutazione</label>
+                <input type="date" class="form-input" id="insurance-data" value="">
+            </div>
+        </div>
+        
+        <div class="equipment-section">
+            <div class="equipment-header">
+                <h3>Attrezzature da Assicurare</h3>
+                <div id="insurance-total" style="font-size: 18px; font-weight: bold; color: #2c5aa0;">
+                    Totale: € 0
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">☑</th>
+                            <th style="width: 150px;">Categoria</th>
+                            <th style="width: 250px;">Attrezzatura</th>
+                            <th style="width: 60px;">Qtà</th>
+                            <th style="width: 120px;">Seriale</th>
+                            <th style="width: 120px;">Valore Unit.</th>
+                            <th style="width: 120px;">Valore Tot.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="insurance-items">
+                        <!-- Popolato dinamicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 10px; justify-content: center; margin: 30px 0;">
+            <button class="btn btn-success" onclick="saveInsuranceData()">💾 Salva Valori</button>
+            <button class="btn btn-info" onclick="generateInsuranceFromTab()">📄 Genera PDF</button>
+            <button class="btn btn-danger" onclick="resetInsuranceValues()">🔄 Reset Valori</button>
+        </div>
+    </div>
+    
+    <div id="insurance-empty" style="text-align: center; padding: 60px; color: #666;">
+        <h3>Seleziona un preventivo per gestire i valori assicurativi</h3>
+        <p>I valori di default verranno presi dal database, ma potrai modificarli</p>
+    </div>
+</div>
+
+    <!-- ANALYTICS TAB -->
+    <div id="analytics" class="tab-content">
+        <div class="section-header">
+            <h2 class="section-title">Analytics & Statistiche</h2>
+            <button class="btn btn-info" onclick="generateAnalyticsReport()">📊 Report Completo</button>
+        </div>
+        <div class="form-grid">
+            <div style="background: white; padding: 20px; border-radius: 15px; text-align: center;">
+                <h3 style="color: #2c5aa0; margin-bottom: 10px;">Preventivi Questo Mese</h3>
+                <div style="font-size: 36px; font-weight: bold; color: #4CAF50;" id="monthlyQuotes">-</div>
+            </div>
+            <div style="background: white; padding: 20px; border-radius: 15px; text-align: center;">
+                <h3 style="color: #2c5aa0; margin-bottom: 10px;">Fatturato Stimato</h3>
+                <div style="font-size: 36px; font-weight: bold; color: #FF9800;" id="estimatedRevenue">-</div>
+            </div>
+            <div style="background: white; padding: 20px; border-radius: 15px; text-align: center;">
+                <h3 style="color: #2c5aa0; margin-bottom: 10px;">Attrezzature Più Richieste</h3>
+                <div style="font-size: 18px; font-weight: bold; color: #2196F3;" id="topEquipment">-</div>
+            </div>
+            <div style="background: white; padding: 20px; border-radius: 15px; text-align: center;">
+                <h3 style="color: #2c5aa0; margin-bottom: 10px;">Tasso di Conversione</h3>
+                <div style="font-size: 36px; font-weight: bold; color: #9C27B0;" id="conversionRate">-</div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
